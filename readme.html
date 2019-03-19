@@ -1,0 +1,36 @@
+<html>
+
+<p>This zip-Folder contains all NEURON simulator files used for the modeling in the Paper 
+</p><p>Lombardi, Jedlicke, Luhmann, Kilb "Interactions between membrane resistance, GABA-A receptor properties, 
+bicarbonate dynamics and Cl--transport shape activity-dependent changes of intra-cellular Cl- concentration."
+International Journal of Molecular Science 2019
+</p><p>Each subfolder contains the hoc and ses files required for the modeling of one subproject.
+  In each subfolder all mod files are stored, they must be tranformed into a DLL with the MkNrnDll.exe program (windows) or
+  equivalent on your platform (if you need more help compiling the mod files and running the model please see:
+  <br/><a href="https://senselab.med.yale.edu/ModelDB/NEURON_DwnldGuide.cshtml">https://senselab.med.yale.edu/ModelDB/NEURON_DwnldGuide.cshtml</a><br/>
+</p><p>To start the model the Start_xxxx.hoc schould be started, which loads the correct cell, implemented the correct 
+mechanisms and runs the simulations. Only some of the "isolated dendrite files" requires the manual implementation
+of .ses files to implement voltage-clamp.
+</p><p>The programs runs without GUI and the results are stored in ASCII files. Please contact me (wkilb at uni-mainz.de)
+for a .xls speadsheed that eases the readout of relevant values (e.g. max min) from these ASCII sheets.
+</p><p>Please be aware that these complex simulations with several repetitions require some time. For most 
+simulations a status report was printed in the main NEURON screen. Most folders also provide a .ses file that 
+can be loaded manually via the GUI and allows visualization of most relevant parameters.
+</p>
+Example run:<br/>
+-----------<br/>
+Change directory to and compile the mod files in the Isolated_Dendrite_gPas__Fig1 folder.
+Start the program start_GABA_isolated_dendrite.hoc (double clicking in windows explorer) with nrngui or using the method appropriate for your platform.
+<p/>
+Press Init & Run and select to Keep Lines in the dend.cli(0.5) graph.
+<p/>
+NEURON Main Menu -> Tools -> Distributed Mechanisms -> Viewers -> Name Values
+<p/>
+then double click on dend and  edit the g_pas (S/cm2) text field in the new parameter window:
+<p/>
+Change the value to 0.018:<p/>
+<img src="./screenshot1.png" alt="screenshot1">
+<p/>the click Init & Run again and you should see an image similar to
+figure 1 C (top) in the paper:
+<p/><img src="./screenshot2.png" alt="screenshot2">
+</html>

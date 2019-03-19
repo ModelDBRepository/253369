@@ -1,0 +1,5 @@
+load_file("nrngui.hoc")
+
+load_file("cell_isolated_dendrite.hoc")
+load_file("init_Cldif_isolated_dendrite.hoc")
+load_file("GABA-Stim_PSC_isolated_dendritegGABA-0789_Var_tauGABA.hoc")

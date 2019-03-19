@@ -1,0 +1,186 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+// Function MakeShort ---------------------------------------//
+// Inputs: $1 Objref to Inputvector                          //
+//         $2 Objref to Outoutvector                         //
+//         lenoutvec  desired lendth of Outputvector         //
+//                                                           //
+// Reduce Inputvec to Outputvev by averaging n elements      //
+// n (reducing factor) = floor(Inputvec.size() / lenoutvec)  //
+// ----------------------------------------------------------//
+
+obfunc MakeShort() {local i, n
+
+  n = int($o1.size()/$3)
+  $o2.resize($3)
+  for i=0, $3-1 {
+    $o2.x[i] = $o1.mean(i*n, (i+1)*n-1)
+  }
+  return $o2
+}   //  End of function
+
+
+// Determining Cl- and HCO3- Properties -----------------------------------
+  Cl_conc = 10
+
+   forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      cli_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      hco3i0_cldif_CA3_NKCC1_HCO3 = 14.1
+      hco3i_Start_cldif_CA3_NKCC1_HCO3 = 14.1
+      hco3i_cldif_CA3_NKCC1_HCO3 = 14.1
+    }
+
+//----- Define run parameters ---------------------
+  tstop = 20000   // Duration
+  v_init = -60   // Initial voltage
+  dt = 0.05      // Step Interval in ms
+  steps_per_ms = 20
+  
+  lenghtoutputvec = 3000                   // Number of Lines for output (< 32000 for Excel-Figures)
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 5        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789 * 2000    //This Value was pultiplished for the analysis 
+  P_GABA = 0.18
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION_1 = 0.5  // Position GABA Synapse for Pulses
+  ONSET_GABA = 100
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn1
+  dend {
+    // insert GABA synapse 
+    gabasyn1 = new gaba(GABA_SYN_LOCATION_1)
+    gabasyn1.tau1 = 0.1
+    gabasyn1.tau2 = DECAY_GABA 
+    gabasyn1.P = P_GABA
+  }
+
+tauCli_Steps = 50                          
+objref tauCli_List
+tauCli_List = new Vector(tauCli_Steps)
+// manually put desired tau_Values in List 
+  for i=0, tauCli_Steps-1{
+    tauCli_List.x[i] = exp(i/8.045)    // exponential increase intau
+    printf("%g - %g, ", i, tauCli_List.x[i])
+  }
+
+fGABA_Steps = 5                           // 3 different decay constants
+objref fGABA_List
+fGABA_List = new Vector(fGABA_Steps)
+// manually put desired tau_Values in List 
+  fGABA_List.x[0] = 3333    // synaptic weight according to miniature events
+  fGABA_List.x[1] = 1000   
+  fGABA_List.x[2] = 333  
+  fGABA_List.x[3] = 100  
+  fGABA_List.x[4] = 33  
+
+// Definition of synaptic Stimuli
+   objref stimGABApuls1
+   stimGABApuls1 = new NetStim(GABA_SYN_LOCATION_1)
+   stimGABApuls1.number = ANZAHL_GABA
+   stimGABApuls1.start = ONSET_GABA
+
+   // Linkage of synaptic Inputs
+   objref synpulsegaba1
+   synpulsegaba1 = new NetCon(stimGABApuls1, gabasyn1, 0, 0, G_GABA)
+
+
+
+// ---------Definition of Output Vectors and File Output --------------
+// --------------------------------------------------------------------
+
+//-- Define  ------
+  objref timevec, shorttimevec
+  objref voltvec, shortvoltvec
+  objref clivec, shortclivec
+  objref voltOutmatrix  
+  objref cliOutmatrix  
+
+  strdef voltOutFileName, cliOutFileName        // Name of File Output
+  objref voltOutFile, cliOutFile
+
+//--- Assign -------
+  timevec = new Vector()
+  shorttimevec = new Vector()
+  voltvec = new Vector()
+  shortvoltvec = new Vector()
+  clivec = new Vector()
+  shortclivec = new Vector()
+  voltOutmatrix = new Matrix()
+  cliOutmatrix = new Matrix()
+
+//-- Link Output Vectors ----------------
+  timevec.record(&t)                          // Time vector
+  voltvec.record(&dend.v(GABA_SYN_LOCATION_1))    
+  clivec.record(&dend.cli(GABA_SYN_LOCATION_1))
+
+
+// --- Simulation starts here
+
+//-- Outer Loop Variation of fGABA -------------------
+
+fGABA_Step = 0
+
+while (fGABA_Step < fGABA_Steps){
+
+   stimGABApuls1.interval = fGABA_List.x[fGABA_Step]
+
+   // Inner Loop Variation of tauCli --------------------------------------------------
+   tauCli_Step = 0
+
+   while (tauCli_Step < tauCli_Steps){
+      forsec all {
+         tau_NKCC1_cldif_CA3_NKCC1_HCO3 = tauCli_List.x[tauCli_Step]
+         tau_passive_cldif_CA3_NKCC1_HCO3 = tauCli_List.x[tauCli_Step]
+       }
+
+    printf("Sequence %g of %g; tauCli = %g, fGABA = %g \n", (fGABA_Step*tauCli_Steps+tauCli_Step+1), (tauCli_Steps*fGABA_Steps), tauCli_List.x[tauCli_Step], fGABA_List.x[fGABA_Step])
+ 
+    // Run Simulation --------------------------------------------------------
+       run()
+    
+    // Put Data in Output Matrix --------------------------------------------
+    // ---- => shrink the parameters to output-size before ---------------------
+        MakeShort(timevec, shorttimevec, lenghtoutputvec)   
+        voltOutmatrix.resize(shorttimevec.size(), 1 + fGABA_Steps*tauCli_Steps)
+        MakeShort(voltvec, shortvoltvec, lenghtoutputvec)
+        voltOutmatrix.setcol(0, shorttimevec)
+        shortvoltvec.x[0] = tauCli_List.x[tauCli_Step] 
+        shortvoltvec.x[1] = fGABA_List.x[fGABA_Step]
+        voltOutmatrix.setcol(fGABA_Step*tauCli_Steps+tauCli_Step+1, shortvoltvec)  
+        MakeShort(clivec, shortclivec, lenghtoutputvec)
+        shortclivec.x[0] = tauCli_List.x[tauCli_Step] 
+        shortclivec.x[1] = fGABA_List.x[fGABA_Step]
+        cliOutmatrix.resize(shorttimevec.size(), 1 + fGABA_Steps*tauCli_Steps)
+        cliOutmatrix.setcol(0, shorttimevec)
+        cliOutmatrix.setcol(fGABA_Step*tauCli_Steps+tauCli_Step+1, shortclivec) 
+
+     // Goto next tauCli_value
+     tauCli_Step+=1
+  } 
+  // End inner loop ---------------------------------
+  
+  // Goto next fGABA
+  fGABA_Step+=1
+} // End of outer loop
+
+// Save the Data --------------------------------------------------------------------
+  voltOutFile = new File()
+  sprint(voltOutFileName, "Result_Soma_Dendrite_Var_tauCli_Var-fGABA_Volt.asc")
+  voltOutFile.wopen(voltOutFileName) 
+  voltOutmatrix.fprint(voltOutFile, "\t%g")     
+  voltOutFile.close
+
+  cliOutFile = new File()
+  sprint(cliOutFileName, "Result_Soma_Dendrite_Var_tauCli_Var-fGABA_Cli.asc")
+  cliOutFile.wopen(cliOutFileName) 
+  cliOutmatrix.fprint(cliOutFile, "\t%g")     
+  cliOutFile.close
+ 

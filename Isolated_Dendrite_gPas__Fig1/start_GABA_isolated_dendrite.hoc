@@ -1,0 +1,9 @@
+load_file("nrngui.hoc")
+
+load_file("Isolated_dendrite_Gpas.hoc")
+//load_file("Isolated_dendrite_VDpas.hoc")
+load_file("init_Cldif_isolated_dendrite.hoc")
+load_file("GABA-Stim_long_isolated_dendrite.hoc")
+//load_file("GABA-Stim_PSC_isolated_dendrite.hoc")
+load_file("Isolated_Dendrite.ses")
+//load_file("Isolated_Dendrite_PSP.ses")

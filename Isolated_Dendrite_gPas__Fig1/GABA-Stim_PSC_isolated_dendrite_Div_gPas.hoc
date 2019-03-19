@@ -1,0 +1,107 @@
+// a single synaptic input
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789     // 10 pS Default
+  P_GABA = 0.0
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION = 0.5  // Position GABA Synapse for Pulses
+  ONSET_PULSE = 50  
+
+// Determination of Synapses
+objref gabasyn
+
+dend {
+    // insert GABA synapse 
+    gabasyn = new gaba(GABA_SYN_LOCATION)
+    tau1_gaba = 0.1 
+    tau2_gaba = DECAY_GABA
+    HCO3e_gaba = 22.4 
+    HCO3i_gaba = 14.1
+    P_gaba = P_GABA
+}
+
+// Definition of synaptic Stimuli
+
+objref stimGABApuls //Pulssequenz GABA
+stimGABApuls = new NetStim(GABA_SYN_LOCATION)
+  stimGABApuls.number = ANZAHL_GABA
+  stimGABApuls.start = ONSET_PULSE
+
+// Linkage of synaptic Inputs
+
+objref synpulsegaba
+
+dend {
+    	synpulsegaba = new NetCon(stimGABApuls, gabasyn, 0, 0, G_GABA)
+}
+
+//-----begin loop ---------------------
+Loops = 20
+tstop = 250   // Duration
+v_init = -60   // Initial voltage
+dt = 0.01      // Step Interval in ms
+
+//-- Define Output Vectors and Files ------
+objref timevec, voltvec, clivec
+objref OutmatrixV, OutmatrixCl
+
+
+voltvec = new Vector()
+timevec = new Vector()
+clivec = new Vector()
+OutmatrixV = new Matrix()
+OutmatrixCl = new Matrix()
+
+strdef OutFileNameV, OutFileNameCl
+objref OutFileV, OutFileCl 
+
+gPas_Value = 0.00000543840  // Corresponding to 10 GOhm Rinput in simulated cell
+
+for i=0, Loops-1 {
+  
+  // assign gPas to Dendrite ------------
+  dend {
+    insert pas
+      g_pas = gPas_Value
+      e_pas = -60
+    }
+  // Link Output Vectors ----------------
+  timevec.record(&t)   // Time vector
+  voltvec.record(&dend.v(.5)) // Volt vector in dendrite
+  clivec.record(&dend.cli(0.5))
+
+  // Run Simulation --------------------------------------------------------
+
+     run()
+  
+  // put Data in Output Matrix
+     timevec.insrt(0,222222) 
+     voltvec.insrt(0,gPas_Value) 
+     clivec.insrt(0,gPas_Value)
+
+     OutmatrixV.resize(timevec.size()+1, Loops+1)
+     OutmatrixV.setcol(0, timevec)
+     OutmatrixV.setcol(i, voltvec)
+     OutmatrixCl.resize(timevec.size()+2, Loops+1)
+     OutmatrixCl.setcol(0, timevec)
+     OutmatrixCl.setcol(i, clivec)
+
+     printf("Sequence %g of %g; gPas = %g,  \n", i, Loops, gPas_Value)  
+  
+
+  // Next gPas ----------------------------------------
+  gPas_Value = gPas_Value / 1.3333333
+} // End of for loop
+
+// Save the Data --------------------------------------------------------------------
+OutFileV = new File()
+OutFileCl = new File()
+sprint(OutFileNameV, "Result_V_of_isoDend_pGABA_0_Var_gPas.asc")
+sprint(OutFileNameCl, "Result_Cl_of_isoDend_pGABA_0_Var_gPas.asc")
+OutFileV.wopen(OutFileNameV) 
+OutFileCl.wopen(OutFileNameCl)
+OutmatrixV.fprint(OutFileV, "\t%g")     
+OutmatrixCl.fprint(OutFileCl, "\t%g") 
+OutFileV.close
+OutFileCl.close

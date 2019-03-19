@@ -1,0 +1,154 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// Define spatial properties of dendrite
+  ANZAHL_NODES = 100
+  MAX_FAKTOR = 100
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789     //This Value was pultiplid for the analysis 
+  P_GABA = 0.0
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION = 0.5  // Position GABA Synapse for Pulses
+  ONSET_PULSE = 10  
+
+//----- Define run parameters ---------------------
+  tstop = 4000   // Duration
+  v_init = -60   // Initial voltage
+  dt = 0.5      // Step Interval in ms
+  lenghtoutputvec = 2000                   // Number of Lines for output (< 32000 for Excel-Figures)
+
+
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn
+  dend {
+    // insert GABA synapse 
+    gabasyn = new gaba(GABA_SYN_LOCATION)
+    tau1_gaba = 0.1 
+    tau2_gaba = DECAY_GABA
+    HCO3e_gaba = 22.4 
+    HCO3i_gaba = 14.1
+    P_gaba = P_GABA
+  }
+
+// Definition of synaptic Stimuli
+  objref stimGABApuls //Pulssequenz GABA
+  stimGABApuls = new NetStim(GABA_SYN_LOCATION)
+  stimGABApuls.number = ANZAHL_GABA
+  stimGABApuls.start = ONSET_PULSE
+
+// Linkage of synaptic Inputs
+  objref synpulsegaba
+
+
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+// Function MakeShort ---------------------------------------//
+// Inputs: $1 Objref to Inputvector                          //
+//         $2 Objref to Outoutvector                         //
+//         lenoutvec  desired lendth of Outputvector         //
+//                                                           //
+// Reduce Inputvec to Outputvev by averaging n elements      //
+// n (reducing factor) = floor(Inputvec.size() / lenoutvec)  //
+// ----------------------------------------------------------//
+
+obfunc MakeShort() {local i, n
+
+  n = int($o1.size()/$3)
+  $o2.resize($3)
+  for i=0, $3-1 {
+    $o2.x[i] = $o1.mean(i*n, (i+1)*n-1)
+  }
+  return $o2
+}   //  End of function
+
+
+// ---------Definition of Output Vectors and File Output --------------
+// --------------------------------------------------------------------
+
+//-- Define  ------
+  objref timevec, shorttimevec
+  objref voltvec[ANZAHL_NODES], shortvoltvec, voltvec_aver
+  objref clivec[ANZAHL_NODES], shortclivec, clivec_aver
+  objref Outmatrix  //0=time, FAKTOR=Cl-, MAX_FAKTOR+FAKTOR = v
+
+  strdef OutFileName                       // Name of File Output
+  objref OutFile 
+
+//--- Assign -------
+  timevec = new Vector()
+  shorttimevec = new Vector()
+  for i = 0, ANZAHL_NODES-1 {    
+     voltvec[i] = new Vector()
+     clivec[i] = new Vector()
+  }
+  clivec_aver = new Vector()
+  voltvec_aver = new Vector()
+  shortclivec = new Vector()
+  shortvoltvec = new Vector()
+  Outmatrix = new Matrix()
+
+
+//-- Link Output Vectors ----------------
+  timevec.record(&t)                          // Time vector
+  for i = 0, ANZAHL_NODES-1 {                 // Generate Vektor for each node
+    voltvec[i].record(&dend.v(i/ANZAHL_NODES))    
+    clivec[i].record(&dend.cli(i/ANZAHL_NODES))
+  }
+
+// --- Simulation starts here
+
+FAKTOR = 1
+while (FAKTOR <= MAX_FAKTOR) {
+
+  // Assign Value to Synapse
+  dend {
+    	synpulsegaba = new NetCon(stimGABApuls, gabasyn, 0, 0, G_GABA*FAKTOR)
+  }
+
+  printf("Faktor = %g of %g ", FAKTOR, MAX_FAKTOR)
+
+  // Run Simulation --------------------------------------------------------
+     run()
+  
+  // Put Data in Output Matrix --------------------------------------------
+  // ---- => shrink the parameters to output-size before ---------------------
+   MakeShort(timevec, shorttimevec, lenghtoutputvec)   
+   Outmatrix.resize(shorttimevec.size(), 1 + 2 * MAX_FAKTOR)
+   Outmatrix.setcol(0, shorttimevec)
+   
+   // Calculate average [Cli] over all Nodes -------
+   clivec_aver.resize(clivec[0].size())
+   voltvec_aver.resize(voltvec[0].size())
+   clivec_aver.mul(0)                      // empty vector
+   voltvec_aver.mul(0) 
+   for i=0, ANZAHL_NODES-1 {
+        clivec_aver.add(clivec[i])
+        voltvec_aver.add(voltvec[i])
+    } 
+    clivec_aver.div(ANZAHL_NODES)
+    voltvec_aver.div(ANZAHL_NODES)
+
+   printf(" => [Cl-]i = %g mM, Em = %g mV \n", clivec_aver.min(), voltvec_aver.max())
+
+   // Put Vectors in Outmatrix 
+   MakeShort(clivec_aver, shortclivec, lenghtoutputvec)   
+   MakeShort(voltvec_aver, shortvoltvec, lenghtoutputvec)
+   Outmatrix.setcol(FAKTOR, shortclivec)
+   Outmatrix.setcol(MAX_FAKTOR + FAKTOR, shortvoltvec)
+  
+   // Goto next FAKTOR
+     FAKTOR+=1
+}  // end of FAKTOR _ LOOP
+
+
+// Save the Data --------------------------------------------------------------------
+  OutFile = new File()
+  sprint(OutFileName, "Result_Isolated_Dendrite_Var_gGABA.asc")
+  OutFile.wopen(OutFileName) 
+  Outmatrix.fprint(OutFile, "\t%g")     
+  OutFile.close

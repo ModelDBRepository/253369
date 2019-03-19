@@ -1,0 +1,8 @@
+// Start
+
+load_file("nrngui.hoc")
+load_file("cell_soma_dendrite_1000um.hoc")
+load_file("init_Cldif_isolated_dendrite.hoc")
+load_file("Freq_PSC.ses")
+load_file("GABA-Stim_2xPSC_Spatial_Sum_isolated_dendrite_enlarged_tauNKCC1.hoc")
+

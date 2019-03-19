@@ -1,0 +1,39 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// Define spatial properties of dendrite
+  ANZAHL_NODES = 100
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789 * 2000    //This Value was pultiplished for the analysis 
+  P_GABA = 0.18
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION = 0.5  // Position GABA Synapse for Pulses
+  ONSET_PULSE = 500
+
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn
+  dend {
+    // insert GABA synapse 
+    gabasyn = new gaba(GABA_SYN_LOCATION)
+    tau1_gaba = 0.1
+    tau2_gaba = DECAY_GABA 
+    HCO3e_gaba = 22.4 
+    HCO3i_gaba = 14.1
+    P_gaba = P_GABA
+  }
+
+// Definition of synaptic Stimuli
+  objref stimGABApuls //Pulssequenz GABA
+  stimGABApuls = new NetStim(GABA_SYN_LOCATION)
+  stimGABApuls.number = ANZAHL_GABA
+  stimGABApuls.start = ONSET_PULSE
+
+// Linkage of synaptic Inputs
+  objref synpulsegaba
+  synpulsegaba = new NetCon(stimGABApuls, gabasyn, 0, 0, G_GABA)
+
+
+

@@ -1,0 +1,217 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+
+// Define spatial properties of dendrite
+  ANZAHL_NODES = 100
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789 * 100
+  P_GABA = 0.0
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION = 0.5  // Position GABA Synapse for Pulses
+  ONSET_PULSE = 50  
+
+// Determining Cl- and HCO3- Properties -----------------------------------
+  Cl_conc = 30 
+
+
+   forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      cli_cldif_CA3_NKCC1_HCO3 = Cl_conc
+    }
+
+
+//----- Define run parameters ---------------------
+  tstop = 3000   // Duration
+  v_init = -60   // Initial voltage
+  dt = 0.05      // Step Interval in ms
+  steps_per_ms = 20
+  
+  lenghtoutputvec = 2000                   // Number of Lines for output (< 32000 for Excel-Figures)
+
+
+// Determining tau HCO3- ---------------------------
+   tauHCO3_Steps = 4  // Number of Different tau_HCO3
+   objref tauHCO3_List
+   tauHCO3_List = new Vector(tauHCO3_Steps)
+   // manually put desired tau_Values in List 
+   tauHCO3_List.x[0] = 1    // tau = 1 ms
+   tauHCO3_List.x[1] = 90   // tau = 90 ms
+   tauHCO3_List.x[2] = 518  // tau = 0.5 s
+   tauHCO3_List.x[3] = 2980 // tau = 3 s
+
+
+// Determining relative GABA receptor HCO3 conductivity ---------------------------
+
+pGABA_Steps = 2                           // 2 different P_GABA
+objref pGABA_List
+pGABA_List = new Vector(pGABA_Steps)
+// manually put desired tau_Values in List 
+  pGABA_List.x[0] = 0.18   
+  pGABA_List.x[1] = 0.44  
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn
+  dend {
+    // insert GABA synapse 
+    gabasyn = new gaba(GABA_SYN_LOCATION)
+    tau1_gaba = 0.1 
+    tau2_gaba = DECAY_GABA
+    HCO3e_gaba = 22.4 
+    HCO3i_gaba = 14.1
+  }
+
+// Definition of synaptic Stimuli
+  objref stimGABApuls //Pulssequenz GABA
+  stimGABApuls = new NetStim(GABA_SYN_LOCATION)
+  stimGABApuls.number = ANZAHL_GABA
+  stimGABApuls.start = ONSET_PULSE
+
+  objref synpulsegaba
+  synpulsegaba = new NetCon(stimGABApuls, gabasyn, 0, 0, G_GABA)
+
+
+
+// ---------Definition of Output Vectors and File Output --------------
+// --------------------------------------------------------------------
+
+//-- Define  ------
+  objref timevec, nodevec
+  objref voltvec[ANZAHL_NODES], voltvec_max
+  objref clivec[ANZAHL_NODES], clivec_max
+  objref hco3ivec[ANZAHL_NODES], hco3ivec_max
+  objref voltOutmatrix  
+  objref cliOutmatrix  
+  objref hco3iOutmatrix  
+
+  strdef voltOutFileName, cliOutFileName, hco3iOutFileName        // Name of File Output
+  objref voltOutFile, cliOutFile, hco3iOutFile
+
+//--- Assign -------
+  timevec = new Vector()
+  nodevec = new Vector()
+  for i = 0, ANZAHL_NODES-1 {    
+     voltvec[i] = new Vector()
+     clivec[i] = new Vector()
+     hco3ivec[i] = new Vector()
+  }
+  clivec_max = new Vector()
+  hco3ivec_max = new Vector()
+  voltvec_max = new Vector()
+  voltOutmatrix = new Matrix()
+  cliOutmatrix = new Matrix()
+  hco3iOutmatrix = new Matrix()
+
+//-- Link Output Vectors ----------------
+  timevec.record(&t)                          // Time vector
+  for i = 0, ANZAHL_NODES-1 {                 // Generate Vektor for each node
+    voltvec[i].record(&dend.v(i/ANZAHL_NODES))    
+    clivec[i].record(&dend.cli(i/ANZAHL_NODES))
+    hco3ivec[i].record(&dend.hco3i(i/ANZAHL_NODES))
+  }
+  nodevec.resize(ANZAHL_NODES + 3)
+  
+  
+  for i = 0, ANZAHL_NODES - 1 {
+         nodevec.x[i+3] = i+1
+     }
+
+// --- Simulation starts here
+
+//-- Outer Loop Variation of gGABA -------------------
+
+tauHCO3_Step = 0
+
+while (tauHCO3_Step < tauHCO3_Steps){
+      forsec all {
+            tau_hco3_cldif_CA3_NKCC1_HCO3 = tauHCO3_List.x[tauHCO3_Step]
+    }
+
+   
+  // Inner Loop Variation of P_GABA --------------------------------------------------
+
+  pGABA_Step = 0
+
+  while (pGABA_Step < pGABA_Steps){
+
+    // 1. assign P_GABA to synapse ----------------------------------------------
+    gabasyn.P = pGABA_List.x[pGABA_Step]  
+    
+    printf("Sequence %g of %g; tauHCO3- = %g, p(GABA) = %g, ", (pGABA_Step*tauHCO3_Steps+tauHCO3_Step+1), (tauHCO3_Steps*pGABA_Steps), tauHCO3_List.x[tauHCO3_Step], pGABA_List.x[pGABA_Step])
+
+   // Run Simulation --------------------------------------------------------
+       run()
+    
+    // Put Data in Output Matrix --------------------------------------------
+
+     voltOutmatrix.resize(ANZAHL_NODES+3, 1 + pGABA_Steps*tauHCO3_Steps)
+     voltOutmatrix.setcol(0, nodevec)
+     cliOutmatrix.resize(ANZAHL_NODES+3, 1 + pGABA_Steps*tauHCO3_Steps)
+     cliOutmatrix.setcol(0, nodevec)
+     hco3iOutmatrix.resize(ANZAHL_NODES+3, 1 + pGABA_Steps*tauHCO3_Steps)
+     hco3iOutmatrix.setcol(0, nodevec)
+     clivec_max.resize(ANZAHL_NODES+3)
+     hco3ivec_max.resize(ANZAHL_NODES+3)
+     voltvec_max.resize(ANZAHL_NODES+3)
+     for i=0, ANZAHL_NODES-1 {
+        clivec_max.x[i+3] = clivec[i].min
+        hco3ivec_max.x[i+3] = hco3ivec[i].min
+        voltvec_max.x[i+3] = voltvec[i].min
+    } 
+
+
+    printf(" => [Cl-]i = %g - %g mM, [HCO3-]i = %g - %g mM, Em = %g - %g mV \n", clivec_max.min(3-ANZAHL_NODES), clivec_max.max(3-ANZAHL_NODES), hco3ivec_max.min(3-ANZAHL_NODES), hco3ivec_max.max(3-ANZAHL_NODES), voltvec[50].min(), voltvec[50].max())
+
+     
+
+   voltvec_max.x[0] = tauHCO3_List.x[tauHCO3_Step] 
+   voltvec_max.x[1] = pGABA_List.x[pGABA_Step]
+   voltvec_max.x[2] = 7777
+   clivec_max.x[0] = tauHCO3_List.x[tauHCO3_Step] 
+   clivec_max.x[1] = pGABA_List.x[pGABA_Step]
+   clivec_max.x[2] = 7777
+   hco3ivec_max.x[0] = tauHCO3_List.x[tauHCO3_Step] 
+   hco3ivec_max.x[1] = pGABA_List.x[pGABA_Step]
+   hco3ivec_max.x[2] = 7777
+
+
+   cliOutmatrix.setcol(pGABA_Step*tauHCO3_Steps+tauHCO3_Step+1, clivec_max)
+   hco3iOutmatrix.setcol(pGABA_Step*tauHCO3_Steps+tauHCO3_Step+1, hco3ivec_max)
+   voltOutmatrix.setcol(pGABA_Step*tauHCO3_Steps+tauHCO3_Step+1, voltvec_max)
+
+  
+     // Goto next p_GABA
+     pGABA_Step+=1
+  }  
+  // End inner loop ---------------------------------
+
+  // Goto next tauHCO3_value
+     tauHCO3_Step+=1
+} // End of outer loop
+
+
+// Save the Data --------------------------------------------------------------------
+  voltOutFile = new File()
+  sprint(voltOutFileName, "Result_PSC_isolated_dendrite_gGABA-0.0789_pGABA-018_Cli-30-var_tauHCO3_spatiotemp_Volt.asc")
+  voltOutFile.wopen(voltOutFileName) 
+  voltOutmatrix.fprint(voltOutFile, "\t%g")     
+  voltOutFile.close
+
+  cliOutFile = new File()
+  sprint(cliOutFileName, "Result_PSC_isolated_dendrite_gGABA-0.0789_pGABA-018_Cli-30-var_tauHCO3_spatiotemp_Cli.asc")
+  cliOutFile.wopen(cliOutFileName) 
+  cliOutmatrix.fprint(cliOutFile, "\t%g")     
+  cliOutFile.close
+ 
+  hco3iOutFile = new File()
+  sprint(hco3iOutFileName, "Result_PSC_isolated_dendrite_gGABA-0.0789_pGABA-018_Cli-30-var_tauHCO3_spatiotemp_hco3.asc")
+  hco3iOutFile.wopen(hco3iOutFileName) 
+  hco3iOutmatrix.fprint(hco3iOutFile, "\t%g")     
+  hco3iOutFile.close
+

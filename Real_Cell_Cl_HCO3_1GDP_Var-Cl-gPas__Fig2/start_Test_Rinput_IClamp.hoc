@@ -1,0 +1,5 @@
+// Start
+
+load_file("nrngui.hoc")
+load_file("Cell1_Cl_HCO3_GPas.hoc")
+load_file("Test_Rinput_IClamp.ses")

@@ -1,0 +1,30 @@
+
+// recall of Chloride Diffusion Model of Peter Jedlicka
+
+forall {
+    insert cldif_CA3
+      cli0_cldif_CA3 = 30
+      clo0_cldif_CA3 = 133.5
+      cli_cldif_CA3 = 30
+      clo_cldif_CA3 =133.5
+      cli_Start_cldif_CA3 = 30
+
+      celsius = 31
+}
+
+
+//define ionic concentrations
+cli0_cl_ion = cli0_cldif_CA3
+clo0_cl_ion = clo0_cldif_CA3
+
+
+
+
+
+
+
+
+
+
+
+

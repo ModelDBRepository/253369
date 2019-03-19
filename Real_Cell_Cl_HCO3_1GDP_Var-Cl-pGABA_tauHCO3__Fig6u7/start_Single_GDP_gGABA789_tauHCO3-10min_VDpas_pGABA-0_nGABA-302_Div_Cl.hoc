@@ -1,0 +1,5 @@
+// Start
+
+load_file("nrngui.hoc")
+load_file("Cell1_Cl_HCO3_VDPas.hoc")
+load_file("Single_GDP_gGABA789_tauHCO3-10min_VDpas_pGABA-0_nGABA-302_Div_Cl.hoc")

@@ -1,0 +1,132 @@
+//--------------------------------------------------------------------
+// Simulation of  a single GDP
+//---------------------------------------------------------------------
+
+// ------------Definition of Parameters -------------------------------
+// --------------------------------------------------------------------
+
+
+// Determining Cl- Properties --------------------------------------
+Cli = 10 // [Cl-]i  
+tauCli_Step = 0       // define here wich tau_CLi to pick
+
+
+tauCli_Steps = 4                           // 3 different decay constants
+objref tauCli_List
+tauCli_List = new Vector(tauCli_Steps)
+// manually put desired tau_Values in List 
+  tauCli_List.x[0] = 100       // synaptic weight according to miniature events
+  tauCli_List.x[1] = 1000   
+  tauCli_List.x[2] = 10000   
+  tauCli_List.x[3] = 10^8 
+
+// Determination Parameters GABA ------------------------------------
+
+DECAY_GABA = 37
+G_GABA = 0.000789
+P_GABA = 0.18
+ngabasyn = 395 
+gninputs = 1 // number of inputs per synapse
+
+
+// Definition of various runtime parameters --------------------------
+
+ndend=56  // Number of dendrites
+
+seed = 8  // seed for random function
+   
+tstop = 1500   // Duration
+v_init = -60   // Initial voltage
+dt = 0.005       // Step Interval in ms
+steps_per_ms = 1
+
+
+
+// ---------Definition of objects -------------------------------------
+// --------------------------------------------------------------------
+
+
+// Objects for GABA Synapses ---------------------------------------------------------
+objref GABA_SYN_LOCATION
+GABA_SYN_LOCATION = new Random(seed)                // Position of GABA synapse as random Object
+
+objref gabasyn[ngabasyn]                            // Definition of synapse objects
+
+// random function for localization of synapses
+objref rand_loc
+
+// random function for synapses parameters
+objref rand_gaba_t, rand_gaba_g
+
+// definition of Vectors for Gaba-Stimulation (t_vec = timestamps t_vecr = sorted timestamps, g_vec = rel conductance)
+objref gabastim[ngabasyn], gaba_t_vec[ngabasyn], gaba_t_vecr[ngabasyn], synpulsegaba[ngabasyn], gaba_g_vec[ngabasyn]
+
+
+
+// Start of Input generation -------------------------------------------
+
+// initiation of Random functions
+rand_loc = new Random(seed)
+rand_gaba_t = new Random(seed)
+rand_gaba_g = new Random(seed)
+
+//Define properties of random Function
+rand_gaba_t.normal(600, 9000)
+rand_gaba_g.normal(1, 0.28) //rel variance of GABA according to results
+
+// generate Vectors --- (gniputs, aninputs defines number of inputs per synapse) ------
+for i = 0, ngabasyn-1 {
+  gaba_t_vec[i] = new Vector(gninputs)
+  gaba_t_vecr[i] = new Vector(gninputs)
+  gaba_g_vec[i] = new Vector(gninputs)
+}
+
+  // 1. Distribute GABA synapses -----------------------------------------------------------
+
+    for k=0, ngabasyn-1 {
+      pos = rand_loc.uniform(0,ndend-1)
+      pos2 = GABA_SYN_LOCATION.uniform (0.0001, 0.999)
+      dend_0[pos]{
+        gabasyn[k] = new gaba(pos2)
+        gabasyn[k].tau1 = 0.1
+        gabasyn[k].P = P_GABA
+        }
+      }
+
+    // 2. Generate timestamps/conductances for GABA synapses --------------------------------------
+    for f=0, ngabasyn-1 {
+      for i=0, gninputs-1 {
+          t = rand_gaba_t.repick()
+          g = rand_gaba_g.repick()
+          gaba_t_vec[f].x[i]=t
+          gaba_g_vec[f].x[i]=G_GABA
+      }
+    }
+
+    for f=0, ngabasyn-1 {
+      gaba_t_vecr[f] = gaba_t_vec[f].sort()
+    }
+
+
+  // 3. generate Vecstim-vectrors from the sorted timestamp-vectors -------------------------------
+      for i=0, ngabasyn-1 {
+        gabastim[i] = new VecStim()
+        gabastim[i].play(gaba_t_vecr[i])
+      }                                                 // GABA stimulator
+
+
+  // 4. Play the Vecstim objects to the synapses ---------------------------------------------
+      for i=0, ngabasyn-1 {
+        synpulsegaba[i] = new NetCon(gabastim[i], gabasyn[i], 0, 0, G_GABA)
+      }                                                  // GABA NetCon
+
+ 
+  // 5. Determine Properties of Cl- Homeostasis  
+    forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cli
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cli
+      cli_cldif_CA3_NKCC1_HCO3 = Cli
+      tau_NKCC1_cldif_CA3_NKCC1_HCO3 = tauCli_List.x[tauCli_Step]
+      tau_passive_cldif_CA3_NKCC1_HCO3 = tauCli_List.x[tauCli_Step]
+    }
+

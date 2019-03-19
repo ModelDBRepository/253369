@@ -1,0 +1,242 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// Define spatial properties of dendrite
+  ANZAHL_NODES = 100
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789 * 10     
+  P_GABA = 0.0
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION = 0.5  // Position GABA Synapse for Pulses
+  ONSET_PULSE = 50  
+
+// Determination Parameters Membrane-Transport
+  TAU_HCO3 = 5
+  TAU_NKCC1 = 174000     // (ms) 174 s From Kolbaev, Lombardi kilb (in Prep) - kinetics after Cl decline
+  TAU_passive = 321000   // (ms) 321 s From Kolbaev, Lombardi Kilb (in prep) - kinetics after bumetanid washin
+
+//----- Define run parameters ---------------------
+  tstop = 4000   // Duration
+  v_init = -60   // Initial voltage
+  dt = 0.1      // Step Interval in ms
+  steps_per_ms = 10
+  
+  lenghtoutputvec = 2000                   // Number of Lines for output (< 32000 for Excel-Figures)
+
+// Determining Cl- Properties --------------------------------------
+Cl_Steps = 50  // Number of Different [Cl-]i  
+Min_Cl = 1
+Max_Cl = 50
+
+    // Write Vektor with Cl- Values
+    objref Cl_List
+    Cl_List = new Vector(Cl_Steps)
+    for i=0, Cl_Steps-1 {
+       Cl_List.x[i] = Min_Cl + i*((Max_Cl-Min_Cl)/(Cl_Steps-1))
+    }
+
+// Determining GABA receptor conductivity ---------------------------
+
+pGABA_Steps = 3                           // 3 different decay constants
+objref pGABA_List
+pGABA_List = new Vector(pGABA_Steps)
+// manually put desired tau_Values in List 
+  pGABA_List.x[0] = 0        // synaptic weight according to miniature events
+  pGABA_List.x[1] = 0.18   
+  pGABA_List.x[2] = 0.44  
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn
+  dend {
+    // insert GABA synapse 
+    gabasyn = new gaba(GABA_SYN_LOCATION)
+    tau1_gaba = 0.1 
+    tau2_gaba = DECAY_GABA
+    HCO3e_gaba = 22.4 
+    HCO3i_gaba = 14.1
+    P_gaba = P_GABA
+  }
+
+// Definition of synaptic Stimuli
+  objref stimGABApuls //Pulssequenz GABA
+  stimGABApuls = new NetStim(GABA_SYN_LOCATION)
+  stimGABApuls.number = ANZAHL_GABA
+  stimGABApuls.start = ONSET_PULSE
+
+// Linkage of synaptic Inputs
+  objref synpulsegaba
+   synpulsegaba = new NetCon(stimGABApuls, gabasyn, 0, 0, G_GABA)
+
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+// Function MakeShort ---------------------------------------//
+// Inputs: $1 Objref to Inputvector                          //
+//         $2 Objref to Outoutvector                         //
+//         lenoutvec  desired lendth of Outputvector         //
+//                                                           //
+// Reduce Inputvec to Outputvev by averaging n elements      //
+// n (reducing factor) = floor(Inputvec.size() / lenoutvec)  //
+// ----------------------------------------------------------//
+
+obfunc MakeShort() {local i, n
+
+  n = int($o1.size()/$3)
+  $o2.resize($3)
+  for i=0, $3-1 {
+    $o2.x[i] = $o1.mean(i*n, (i+1)*n-1)
+  }
+  return $o2
+}   //  End of function
+
+
+// ---------Definition of Output Vectors and File Output --------------
+// --------------------------------------------------------------------
+
+//-- Define  ------
+  objref timevec, shorttimevec
+  objref voltvec[ANZAHL_NODES], shortvoltvec, voltvec_aver
+  objref clivec[ANZAHL_NODES], shortclivec, clivec_aver
+  objref hcoivec[ANZAHL_NODES], shorthcoivec, hcoivec_aver
+  objref voltOutmatrix  //0=time
+  objref cliOutmatrix  //0=time
+  objref hcoiOutmatrix  //0=time  
+
+  strdef voltOutFileName, cliOutFileName, hcoiOutFileName                       // Name of File Output
+  objref voltOutFile, cliOutFile, hcoiOutFile
+
+//--- Assign -------
+  timevec = new Vector()
+  shorttimevec = new Vector()
+  for i = 0, ANZAHL_NODES-1 {    
+     voltvec[i] = new Vector()
+     clivec[i] = new Vector()
+     hcoivec[i] = new Vector()
+  }
+  clivec_aver = new Vector()
+  hcoivec_aver = new Vector()
+  voltvec_aver = new Vector()
+  shortclivec = new Vector()
+  shorthcoivec = new Vector()
+  shortvoltvec = new Vector()
+  voltOutmatrix = new Matrix()
+  cliOutmatrix = new Matrix()
+  hcoiOutmatrix = new Matrix()
+
+//-- Link Output Vectors ----------------
+  timevec.record(&t)                          // Time vector
+  for i = 0, ANZAHL_NODES-1 {                 // Generate Vektor for each node
+    voltvec[i].record(&dend.v(i/ANZAHL_NODES))    
+    clivec[i].record(&dend.cli(i/ANZAHL_NODES))
+    hcoivec[i].record(&dend.hco3i(i/ANZAHL_NODES))
+  }
+
+// --- Simulation starts here
+
+//-- Outer Loop Variation of P_GABA -------------------
+
+Cl_Step = 0
+while (Cl_Step < Cl_Steps){
+
+  pGABA_Step = 0
+  while (pGABA_Step < pGABA_Steps){
+
+   // Assign Value to Synapse -----------------------------------------------------------  
+      p_GABA = pGABA_List.x[pGABA_Step]
+      gabasyn.P = p_GABA
+
+ 
+  // Inner Loop Variation of Cl- --------------------------------------------------
+
+
+
+    // 1. define Cl- concentration ----------------------------------------------
+  
+    forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cl_List.x[Cl_Step]
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cl_List.x[Cl_Step]
+      cli_cldif_CA3_NKCC1_HCO3 = Cl_List.x[Cl_Step]
+      tau_hco3_cldif_CA3_NKCC1_HCO3 = TAU_HCO3
+//      tau_NKCC1_cldif_CA3_NKCC1_HCO3 = TAU_NKCC1
+//      tau_passive_cldif_CA3_NKCC1_HCO3 = TAU_passive
+    }
+    
+    printf("Sequence %g of %g; [Cl-]i = %g, p(GABA) = %g, ", (pGABA_Step*Cl_Steps+Cl_Step+1), (Cl_Steps*pGABA_Steps), Cl_List.x[Cl_Step], pGABA_List.x[pGABA_Step])
+
+   // Run Simulation --------------------------------------------------------
+       run()
+    
+    // Put Data in Output Matrix --------------------------------------------
+    // ---- => shrink the parameters to output-size before ---------------------
+     MakeShort(timevec, shorttimevec, lenghtoutputvec)   
+     voltOutmatrix.resize(shorttimevec.size(), 1 + pGABA_Steps*Cl_Steps)
+     voltOutmatrix.setcol(0, shorttimevec)
+     cliOutmatrix.resize(shorttimevec.size(), 1 + pGABA_Steps*Cl_Steps)
+     cliOutmatrix.setcol(0, shorttimevec)
+     hcoiOutmatrix.resize(shorttimevec.size(), 1 + pGABA_Steps*Cl_Steps)
+     hcoiOutmatrix.setcol(0, shorttimevec)
+
+   // Calculate average [Cl]i and [HCO3]i over all Nodes -------
+   clivec_aver.resize(clivec[0].size())
+   hcoivec_aver.resize(clivec[0].size())
+   clivec_aver.mul(0)                      // empty vector
+   hcoivec_aver.mul(0) 
+   for i=0, ANZAHL_NODES-1 {
+        clivec_aver.add(clivec[i])
+        hcoivec_aver.add(hcoivec[i])
+    } 
+    clivec_aver.div(ANZAHL_NODES)
+    hcoivec_aver.div(ANZAHL_NODES)
+
+   printf(" => [Cl-]i = %g-%g mM, [HCO-]i = %g mM, Em = %g-%g mV \n", clivec_aver.max(), clivec_aver.min(), hcoivec_aver.min(), voltvec[50].min(), voltvec[50].max())
+
+   // Put Vectors in Outmatrix 
+   MakeShort(clivec_aver, shortclivec, lenghtoutputvec)
+   MakeShort(hcoivec_aver, shorthcoivec, lenghtoutputvec)   
+   MakeShort(voltvec[50], shortvoltvec, lenghtoutputvec)
+
+   shortvoltvec.x[0] = Cl_List.x[Cl_Step] 
+   shortvoltvec.x[1] = pGABA_List.x[pGABA_Step]
+   shortvoltvec.x[2] = 7777
+   shortclivec.x[0] = Cl_List.x[Cl_Step] 
+   shortclivec.x[1] = pGABA_List.x[pGABA_Step]
+   shortclivec.x[2] = 7777
+   shorthcoivec.x[0] = Cl_List.x[Cl_Step] 
+   shorthcoivec.x[1] = pGABA_List.x[pGABA_Step]
+   shorthcoivec.x[2] = 7777
+
+   cliOutmatrix.setcol(pGABA_Step*Cl_Steps+Cl_Step+1, shortclivec)
+   hcoiOutmatrix.setcol(pGABA_Step*Cl_Steps+Cl_Step+1, shorthcoivec)
+   voltOutmatrix.setcol(pGABA_Step*Cl_Steps+Cl_Step+1, shortvoltvec)
+
+    // Goto next P_GABA
+     pGABA_Step+=1
+  }  
+  // End inner loop ---------------------------------
+
+  // Goto next Cl- Concentration
+  Cl_Step+=1
+} // End of outer loop
+
+
+// Save the Data --------------------------------------------------------------------
+  voltOutFile = new File()
+  sprint(voltOutFileName, "Result_Isolated_Dendrite_tauHCO3-5ms_Var-pGABA_Var-Cl_Volt.asc")
+  voltOutFile.wopen(voltOutFileName) 
+  voltOutmatrix.fprint(voltOutFile, "\t%g")     
+  voltOutFile.close
+
+  cliOutFile = new File()
+  sprint(cliOutFileName, "Result_Isolated_Dendrite_tauHCO3-5ms_Var-pGABA_Var-Cl_cli.asc")
+  cliOutFile.wopen(cliOutFileName) 
+  cliOutmatrix.fprint(cliOutFile, "\t%g")     
+  cliOutFile.close
+
+  hcoiOutFile = new File()
+  sprint(hcoiOutFileName, "Result_Isolated_Dendrite_tauHCO3-5ms_Var-pGABA_Var-Cl_hcoi.asc")
+  hcoiOutFile.wopen(hcoiOutFileName) 
+  hcoiOutmatrix.fprint(hcoiOutFile, "\t%g")     
+  hcoiOutFile.close

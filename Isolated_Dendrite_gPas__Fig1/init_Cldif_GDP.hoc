@@ -1,0 +1,34 @@
+
+// recall of Chloride Diffusion Model of Peter Jedlicka
+
+forall {
+    insert cldif_CA3
+    cli0_cldif_CA3 = 50
+    clo0_cldif_CA3 = 133.5
+    celsius = 31
+}
+
+PREL  = 0.18			// Phco3/Pcl relative permeability
+
+
+
+//define ionic concentrations
+cli0_cl_ion = cli0_cldif_CA3 	 
+clo0_cl_ion = clo0_cldif_CA3
+
+hco3i0_hco3_ion = 16
+hco3o0_hco3_ion = 26
+
+forall{
+	hco3i = 16 hco3o = 26
+	cli=28 clo=133.5
+}
+
+
+
+
+
+
+
+
+

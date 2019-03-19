@@ -1,0 +1,129 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+// Function MakeShort ---------------------------------------//
+// Inputs: $1 Objref to Inputvector                          //
+//         $2 Objref to Outoutvector                         //
+//         lenoutvec  desired lendth of Outputvector         //
+//                                                           //
+// Reduce Inputvec to Outputvev by averaging n elements      //
+// n (reducing factor) = floor(Inputvec.size() / lenoutvec)  //
+// ----------------------------------------------------------//
+
+obfunc MakeShort() {local i, n
+
+  n = int($o1.size()/$3)
+  $o2.resize($3)
+  for i=0, $3-1 {
+    $o2.x[i] = $o1.mean(i*n, (i+1)*n-1)
+  }
+  return $o2
+}   //  End of function
+
+
+// Determining Cl- and HCO3- Properties -----------------------------------
+  Cl_conc = 10
+
+   forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      cli_cldif_CA3_NKCC1_HCO3 = Cl_conc
+      hco3i0_cldif_CA3_NKCC1_HCO3 = 14.1
+      hco3i_Start_cldif_CA3_NKCC1_HCO3 = 14.1
+      hco3i_cldif_CA3_NKCC1_HCO3 = 14.1
+    }
+
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789 * 2000    //This Value was pultiplished for the analysis 
+  P_GABA = 0.18
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION_1 = 0.5  // Position GABA Synapse for Pulses
+  GABA_SYN_LOCATION_2 = 0.5  // Position GABA Synapse for Pulses
+  GABA_SYN_LOCATION_3 = 0.5  // Position GABA Synapse for Pulses
+  GABA_SYN_LOCATION_4 = 0.5  // Position GABA Synapse for Pulses
+  GABA_SYN_LOCATION_5 = 0.5  // Position GABA Synapse for Pulses
+
+
+
+
+
+  ONSET_PULSE_1 = 100
+  ONSET_PULSE_2 = 600
+  ONSET_PULSE_3 = 600
+  ONSET_PULSE_4 = 600 
+  ONSET_PULSE_5 = 600   
+
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn1, gabasyn2, gabasyn3 
+  dend {
+    // insert GABA synapse 
+    gabasyn1 = new gaba(GABA_SYN_LOCATION_1)
+    gabasyn2 = new gaba(GABA_SYN_LOCATION_2)
+    gabasyn3 = new gaba(GABA_SYN_LOCATION_3)
+    gabasyn4 = new gaba(GABA_SYN_LOCATION_4)
+    gabasyn5 = new gaba(GABA_SYN_LOCATION_5)
+    gabasyn1.tau1 = 0.1
+    gabasyn1.tau2 = DECAY_GABA 
+    gabasyn1.P = P_GABA
+    gabasyn2.tau1 = 0.1
+    gabasyn2.tau2 = DECAY_GABA 
+    gabasyn2.P = P_GABA
+    gabasyn3.tau1 = 0.1
+    gabasyn3.tau2 = DECAY_GABA 
+    gabasyn3.P = P_GABA
+    gabasyn4.tau1 = 0.1
+    gabasyn4.tau2 = DECAY_GABA 
+    gabasyn4.P = P_GABA
+    gabasyn5.tau1 = 0.1
+    gabasyn5.tau2 = DECAY_GABA 
+    gabasyn5.P = P_GABA
+  }
+
+   forsec all {
+      tau_NKCC1_cldif_CA3_NKCC1_HCO3 = tauCli_List.x[tauCli_Step]
+      tau_passive_cldif_CA3_NKCC1_HCO3 = tauCli_List.x[tauCli_Step]
+   }
+
+
+   ONSET_PULSE_1 = GABA_Onset + 0 * fGABA_List.x[fGABA_Step]
+   ONSET_PULSE_2 = GABA_Onset + 1 * fGABA_List.x[fGABA_Step]
+   ONSET_PULSE_3 = GABA_Onset + 2 * fGABA_List.x[fGABA_Step]
+   ONSET_PULSE_4 = GABA_Onset + 3 * fGABA_List.x[fGABA_Step] 
+   ONSET_PULSE_5 = GABA_Onset + 4 * fGABA_List.x[fGABA_Step]  
+
+
+
+// Definition of synaptic Stimuli
+  objref stimGABApuls1, stimGABApuls2, stimGABApuls3, stimGABApuls4, stimGABApuls5  //Pulssequenz GABA
+  stimGABApuls1 = new NetStim(GABA_SYN_LOCATION_1)
+  stimGABApuls1.number = ANZAHL_GABA
+  stimGABApuls1.start = ONSET_PULSE_1
+  stimGABApuls2 = new NetStim(GABA_SYN_LOCATION_2)
+  stimGABApuls2.number = ANZAHL_GABA
+  stimGABApuls2.start = ONSET_PULSE_2
+  stimGABApuls3 = new NetStim(GABA_SYN_LOCATION_3)
+  stimGABApuls3.number = ANZAHL_GABA
+  stimGABApuls3.start = ONSET_PULSE_3
+  stimGABApuls4 = new NetStim(GABA_SYN_LOCATION_4)
+  stimGABApuls4.number = ANZAHL_GABA
+  stimGABApuls4.start = ONSET_PULSE_4
+  stimGABApuls5 = new NetStim(GABA_SYN_LOCATION_4)
+  stimGABApuls5.number = ANZAHL_GABA
+  stimGABApuls5.start = ONSET_PULSE_4
+
+// Linkage of synaptic Inputs
+  objref synpulsegaba1,synpulsegaba2, synpulsegaba3 
+  synpulsegaba1 = new NetCon(stimGABApuls1, gabasyn1, 0, 0, G_GABA)
+  synpulsegaba2 = new NetCon(stimGABApuls2, gabasyn2, 0, 0, G_GABA)
+  synpulsegaba3 = new NetCon(stimGABApuls3, gabasyn3, 0, 0, G_GABA)
+  synpulsegaba4 = new NetCon(stimGABApuls4, gabasyn4, 0, 0, G_GABA)
+  synpulsegaba5 = new NetCon(stimGABApuls5, gabasyn5, 0, 0, G_GABA)
+
+
+

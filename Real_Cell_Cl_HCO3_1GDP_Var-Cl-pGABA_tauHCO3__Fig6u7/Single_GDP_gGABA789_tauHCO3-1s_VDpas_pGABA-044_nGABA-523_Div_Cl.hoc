@@ -1,0 +1,260 @@
+//--------------------------------------------------------------------
+// Simulation of  a single GDP
+//---------------------------------------------------------------------
+
+// ------------Definition of Parameters -------------------------------
+// --------------------------------------------------------------------
+
+
+// Determining Cl- Properties --------------------------------------
+Cl_Steps = 11  // Number of Different [Cl-]i  
+Min_Cl = 10
+Max_Cl = 50
+
+    // Write Vektor with Cl- Values
+    objref Cl_List
+    Cl_List = new Vector(Cl_Steps)
+    for i=0, Cl_Steps-1 {
+       Cl_List.x[i] = Min_Cl + i*((Max_Cl-Min_Cl)/(Cl_Steps-1))
+    }
+
+
+// Determination Parameters GABA ------------------------------------
+
+DECAY_GABA = 37
+P_GABA = 0.44
+G_GABA = 0.000789
+ngabasyn = 523
+gninputs = 1 // number of inputs per synapse
+
+
+// Definition of various runtime parameters --------------------------
+
+lenghtoutputvec = 6000  // Number of Lines for output (< 32000 for Excel-Figures)
+
+ndend=56  // Number of dendrites
+
+seed = 8  // seed for random function
+   
+tstop = 1500   // Duration
+v_init = -60   // Initial voltage
+dt = 0.0025    // Step Interval in ms
+steps_per_ms = 100
+
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+// Function MakeShort ---------------------------------------//
+// Inputs: $1 Objref to Inputvector                          //
+//         $2 Objref to Outoutvector                         //
+//         lenoutvec  desired lendth of Outputvector         //
+//                                                           //
+// Reduce Inputvec to Outputvev by averaging n elements      //
+// n (reducing factor) = floor(Inputvec.size() / lenoutvec)  //
+// ----------------------------------------------------------//
+
+obfunc MakeShort() {local i, n
+
+  n = int($o1.size()/$3)
+  $o2.resize($3)
+  for i=0, $3-1 {
+    $o2.x[i] = $o1.mean(i*n, (i+1)*n-1)
+  }
+  return $o2
+}   //  End of function
+
+
+
+// ---------Definition of objects -------------------------------------
+// --------------------------------------------------------------------
+
+
+// Objects for GABA Synapses ---------------------------------------------------------
+objref GABA_SYN_LOCATION
+GABA_SYN_LOCATION = new Random(seed)                // Position of GABA synapse as random Object
+
+objref gabasyn[ngabasyn]                            // Definition of synapse objects
+
+// random function for localization of synapses
+objref rand_loc
+
+// random function for synapses parameters
+objref rand_gaba_t, rand_gaba_g
+
+// definition of Vectors for Gaba-Stimulation (t_vec = timestamps t_vecr = sorted timestamps, g_vec = rel conductance)
+objref gabastim[ngabasyn], gaba_t_vec[ngabasyn], gaba_t_vecr[ngabasyn], synpulsegaba[ngabasyn], gaba_g_vec[ngabasyn]
+
+// Define vectors to link modelled parameter output ---------------------------------
+objref timevec, voltvec, clivec[ndend], hco3ivec[ndend]                   // vectors linked to parameter-pointers
+objref clivec_aver, hco3ivec_aver                                         // vectors for Averagees over all Dendrites
+objref shorttimevec, shortvoltvec, shortclivec, shorthco3ivec, spacevec   // shorter Vectros for output
+
+// Matrix for output 0 = time, 1 = Voltage, 2 = average Cli , 3 to 3+ndend, Cli n Dend[i]
+objref Outmatrix
+
+// Define Name of Output-File
+strdef OutFileName
+
+// Define Output File
+objref OutFile
+
+
+// Generate vectors and matrices -------------------------------------
+voltvec = new Vector()
+timevec = new Vector()
+clivec_aver = new Vector()
+hco3ivec_aver = new Vector()
+shortvoltvec = new Vector()
+shorttimevec = new Vector()
+shortclivec = new Vector()
+shorthco3ivec = new Vector()
+spacevec = new Vector()
+for i=0, ndend-1 {
+  clivec[i] = new Vector()
+  hco3ivec[i] = new Vector()
+}
+Outmatrix = new Matrix()
+
+
+
+// Start of Input generation -------------------------------------------
+
+// initiation of Random functions
+rand_loc = new Random(seed)
+rand_gaba_t = new Random(seed)
+rand_gaba_g = new Random(seed)
+
+//Define properties of random Function
+rand_gaba_t.normal(600, 9000)
+rand_gaba_g.normal(1, 0.28) //rel variance of GABA according to results
+
+// generate Vectors --- (gniputs, aninputs defines number of inputs per synapse) ------
+for i = 0, ngabasyn-1 {
+  gaba_t_vec[i] = new Vector(gninputs)
+  gaba_t_vecr[i] = new Vector(gninputs)
+  gaba_g_vec[i] = new Vector(gninputs)
+}
+
+  // Distribute GABA synapses -----------------------------------------------------------
+
+    for k=0, ngabasyn-1 {
+      pos = rand_loc.uniform(0,ndend-1)
+      pos2 = GABA_SYN_LOCATION.uniform (0.0001, 0.999)
+      dend_0[pos]{
+        gabasyn[k] = new gaba(pos2)
+        gabasyn[k].tau1 = 0.1
+        gabasyn[k].tau2 = DECAY_GABA
+        gabasyn[k].P = P_GABA
+        }
+      }
+
+
+//-- Simulation starts here -----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
+
+
+  // Inner Loop Variation of Cl- --------------------------------------------------
+
+  Cl_Step = 0
+
+  while (Cl_Step < Cl_Steps){
+
+    // 1. define Cl- concentration ----------------------------------------------
+  
+    forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cl_List.x[Cl_Step]
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cl_List.x[Cl_Step]
+      cli_cldif_CA3_NKCC1_HCO3 = Cl_List.x[Cl_Step]
+    }
+    printf("Sequence %g of %g; [Cl-]i = %g, nGABA = %g, ", (Cl_Step+1), (Cl_Steps), Cl_List.x[Cl_Step], ngabasyn)
+
+    // 2. Generate timestamps/conductances for GABA synapses --------------------------------------
+    for f=0, ngabasyn-1 {
+      for i=0, gninputs-1 {
+          t = rand_gaba_t.repick()
+          g = rand_gaba_g.repick()
+          gaba_t_vec[f].x[i]=t
+          gaba_g_vec[f].x[i]=g*G_GABA
+      }
+    }
+
+    for f=0, ngabasyn-1 {
+      gaba_t_vecr[f] = gaba_t_vec[f].sort()
+    }
+
+
+  // 3. generate Vecstim-vectrors from the sorted timestamp-vectors -------------------------------
+      for i=0, ngabasyn-1 {
+        gabastim[i] = new VecStim()
+        gabastim[i].play(gaba_t_vecr[i])
+      }                                                 // GABA stimulator
+
+
+  // 4. Play the Vecstim objects to the synapses ---------------------------------------------
+      for i=0, ngabasyn-1 {
+        synpulsegaba[i] = new NetCon(gabastim[i], gabasyn[i], 0, 0, G_GABA)
+      }                                                  // GABA NetCon
+
+ 
+  // 5. Link Objects to Output-Vectors -----------------------------------
+        timevec.record(&t)   // Time vector
+        voltvec.record(&v(.5)) // Volt vector in soma
+        for i=0, ndend-1 {
+            clivec[i].record(&dend_0[i].cli(0.5))
+            hco3ivec[i].record(&dend_0[i].hco3i(0.5))
+        }
+
+  // 6. Run Simulation --------------------------------------------------------
+
+     run()
+ 
+  // 8. Put Data in Output Vector ------------------------------------------------------  
+   
+ 
+     MakeShort(timevec, shorttimevec, lenghtoutputvec)
+     Outmatrix.resize(shorttimevec.size()+1, Cl_Steps*4+1)
+     Outmatrix.setcol(0, shorttimevec)
+        
+     spacevec.resize(shorttimevec.size()+1) //spavevec caries information about the properties during a loop)
+     spacevec.fill(0) 
+     spacevec.x[0] = Cl_List.x[Cl_Step]
+     spacevec.x[1] = P_GABA
+     spacevec.x[2] = G_GABA
+     spacevec.x[3] = ngabasyn
+     spacevec.x[4] = 777
+     Outmatrix.setcol(Cl_Step*4+1, spacevec)
+
+     MakeShort(voltvec, shortvoltvec, lenghtoutputvec)
+     Outmatrix.setcol(Cl_Step*4+2, shortvoltvec)
+
+    // Calculate average [Cli] in dendrites -------
+     clivec_aver.mul(0) // empty vector
+     hco3ivec_aver.mul(0)
+     for i=0, ndend-1 {
+        clivec_aver.resize(clivec[i].size())
+        clivec_aver.add(clivec[i])
+        hco3ivec_aver.resize(hco3ivec[i].size())
+        hco3ivec_aver.add(hco3ivec[i])
+     } 
+     clivec_aver.div(ndend)
+     printf(", max [Cl-]i %g, min [Cl-]i %g \n", clivec_aver.max, clivec_aver.min)
+     hco3ivec_aver.div(ndend)
+     MakeShort(clivec_aver, shortclivec, lenghtoutputvec)
+     MakeShort(hco3ivec_aver, shorthco3ivec, lenghtoutputvec)
+     Outmatrix.setcol(Cl_Step*4+3, shortclivec)
+     Outmatrix.setcol(Cl_Step*4+4, shorthco3ivec)
+
+     // Goto next Cl- Concentration
+     Cl_Step+=1
+  }  
+  // End inner loop ---------------------------------
+
+
+
+  // Save the Data --------------------------------------------------------------------
+   OutFile = new File()
+   sprint(OutFileName, "Single_GDP_gGABA789_VDpas_pGABA-044_nGABA-523_Div_Cl.asc")
+   OutFile.wopen(OutFileName) 
+   Outmatrix.fprint(OutFile, "\t%g")     
+   OutFile.close

@@ -1,0 +1,166 @@
+//--------------------------------------------------------------------
+// Simulation of  a single GDP
+//------------------------------------------------------------------
+seed_AMPA = 10
+seed_GABA = 22
+
+// ------------------------------------- Parameters -------------------------------------
+
+// Number of dendrites
+ndend=56
+
+// Determination Parameters GABA 
+G_GABA = 0.000789   // synaptic weight according to miniature events 
+DECAY_GABA = 37
+P_GABA = 0.44
+ngabasyn = 534 //Number of GABA-Synapses // calculated was 101
+gninputs = 1 // number of inputs per synapse
+
+// Determination Parameters AMPA
+G_AMPA = 0.000305  // synaptic weight according to miniature event
+DECAY_AMPA = 11
+nampasyn = 107 //Number of AMPA-Synapses  // calculated was 107
+aninputs = 1 // number of inputs per synapse
+
+Resting_Chloride = 50
+
+
+// definition of objects
+
+
+// Definition of synapse objects
+objref gabasyn[ngabasyn], ampasyn[nampasyn] 
+
+// random function for localization of synapses in a dendrite
+objref rand_ampa_loc, rand_gaba_loc 
+
+// random function for localization of synapses in which dendrite
+objref rand_ampa_dend, rand_gaba_dend
+
+// random function for synapses parameters
+objref rand_ampa_t, rand_ampa_g, rand_gaba_t, rand_gaba_g 
+
+// definition of Vectors for Gaba-Stimulation (t_vec = timestamps t_vecr = sorted timestamps, g_vec = rel conductance)
+objref gabastim[ngabasyn], gaba_t_vec[ngabasyn], gaba_t_vecr[ngabasyn], synpulsegaba[ngabasyn], gaba_g_vec[ngabasyn]
+
+// definition of Vectors for AMPA-Stimulation
+objref ampastim[nampasyn], ampa_t_vec[nampasyn], ampa_t_vecr[nampasyn], synpulseampa[nampasyn], ampa_g_vec[nampasyn]
+
+
+// Initialize Random Functions -----------
+rand_ampa_loc = new Random(seed_AMPA)
+rand_gaba_loc = new Random(seed_GABA)
+rand_ampa_dend = new Random(seed_AMPA)
+rand_gaba_dend = new Random(seed_GABA)
+rand_ampa_t = new Random(seed_AMPA)
+rand_ampa_g = new Random(seed_AMPA)
+rand_gaba_t = new Random(seed_GABA)
+rand_gaba_g = new Random(seed_GABA)
+
+//Define properties of random Function ---------
+rand_gaba_t.normal(600, 9000)
+rand_gaba_g.normal(1, 0.28) //rel variance of GABA according to results
+rand_ampa_t.normal(650, 8500)
+rand_ampa_g.normal(1, 0.26) //rel variance of AMPA according to results
+
+
+// start of Input generation -------------------------------------------
+
+
+// generate Vectors --- (gniputs, aninputs defines number of inputs per synapse) ------
+for i = 0, ngabasyn-1 {
+gaba_t_vec[i] = new Vector(gninputs)
+gaba_t_vecr[i] = new Vector(gninputs)
+gaba_g_vec[i] = new Vector(gninputs)
+}
+
+for i = 0, nampasyn-1 {
+ampa_t_vec[i] = new Vector(aninputs)
+ampa_t_vecr[i] = new Vector(aninputs)
+ampa_g_vec[i] = new Vector(aninputs)
+}
+
+// start of main loop -----------------------------------------------------------
+
+
+// 1. define Cl- concentration ----------------------------------------------
+      forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Resting_Chloride
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Resting_Chloride
+      cli_cldif_CA3_NKCC1_HCO3 = Resting_Chloride
+      }
+
+// 2a. distribute GABA synapses -----------------------------------------------------------
+    for k=0, ngabasyn-1 {
+      pos = rand_gaba_loc.uniform(0,ndend-1)
+    pos2 = rand_gaba_dend.uniform (0.0001, 0.999)
+    dend_0[pos]{
+      gabasyn[k] = new gaba(pos2)
+      gabasyn[k].tau1 = 0.1
+      gabasyn[k].tau2 = DECAY_GABA
+      gabasyn[k].P = P_GABA
+    }
+  }                                              
+
+
+// 2b. distribute AMPA synapses ------------------------------------------------------------------------
+  for k=0, nampasyn-1 {
+    pos = rand_ampa_loc.uniform(24,ndend-1)
+    pos3 = rand_ampa_dend.uniform (0.5, 0.999)
+    dend_0[pos]{
+      ampasyn[k] = new Exp2Syn(pos3)
+      ampasyn[k].tau1 = 0.1
+      ampasyn[k].tau2 = DECAY_AMPA
+    }                                              
+  }
+
+// 3a. Generate timestamps/conductances for GABA synapses --------------------------------------
+  for f=0, ngabasyn-1 {
+    for i=0, gninputs-1 {
+        t = rand_gaba_t.repick()
+        g = rand_gaba_g.repick()
+        gaba_t_vec[f].x[i]=t
+        gaba_g_vec[f].x[i]=g * G_GABA
+      }
+    }
+
+  for f=0, ngabasyn-1 {                          
+    gaba_t_vecr[f] = gaba_t_vec[f].sort()
+    }                                               
+
+
+// 3b. Generate timestamps/conductances for AMPA synapses --------------------------------------
+  for f=0, nampasyn-1 {
+    for i=0, aninputs-1 {
+        t = rand_ampa_t.repick()
+        g = rand_ampa_g.repick()
+                ampa_t_vec[f].x[i]=t
+        ampa_g_vec[f].x[i]=g * G_AMPA
+      }
+    }
+  for f=0, nampasyn-1 {                     
+    ampa_t_vecr[f] = ampa_t_vec[f].sort()
+  }                                                
+
+// 4. generate Vecstim-vectrors from the sorted timestamp-vectors -------------------------------
+    for i=0, ngabasyn-1 {
+      gabastim[i] = new VecStim()
+      gabastim[i].play(gaba_t_vecr[i])
+   }                                                 // GABA stimulator
+
+    for i=0, nampasyn-1{
+      ampastim[i] = new VecStim()
+      ampastim[i].play(ampa_t_vecr[i])
+    }                                                 // Ampa stimulator
+
+
+// 5. Play the Vecstim objects to the synapses ---------------------------------------------
+    for i=0, ngabasyn-1 {
+      synpulsegaba[i] = new NetCon(gabastim[i], gabasyn[i], 0, 0, G_GABA)
+ }                                                  // GABA NetCon
+    for i=0, nampasyn-1 {
+      synpulseampa[i] = new NetCon(ampastim[i], ampasyn[i], 0, 0, G_AMPA)
+  }    
+                                             // Ampa NetCon
+
+

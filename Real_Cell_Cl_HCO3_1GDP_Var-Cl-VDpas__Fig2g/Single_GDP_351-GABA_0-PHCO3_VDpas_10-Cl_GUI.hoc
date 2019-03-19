@@ -1,0 +1,192 @@
+//--------------------------------------------------------------------
+// Simulation of  a single GDP
+//---------------------------------------------------------------------
+
+// ------------Definition of Parameters -------------------------------
+// --------------------------------------------------------------------
+
+
+// Determining Cl- Properties --------------------------------------
+Cl_intra = 10 
+
+// Determination Parameters GABA ------------------------------------
+G_GABA = 0.000789   // synaptic weight according to miniature events
+DECAY_GABA = 37
+P_GABA = 0
+ngabasyn = 351 //Number of GABA-Synapses // calculated was 101
+gninputs = 1 // number of inputs per synapse
+
+
+// Definition of various runtime parameters --------------------------
+
+lenghtoutputvec = 6000  // Number of Lines for output (< 32000 for Excel-Figures)
+
+ndend=56  // Number of dendrites
+
+seed = 8  // seed for random function
+   
+tstop = 1300   // Duration
+v_init = -60   // Initial voltage
+dt = 0.01      // Step Interval in ms
+
+
+
+// ------------Procedures and Functions -------------------------------
+// --------------------------------------------------------------------
+
+// Function MakeShort ---------------------------------------//
+// Inputs: $1 Objref to Inputvector                          //
+//         $2 Objref to Outoutvector                         //
+//         lenoutvec  desired lendth of Outputvector         //
+//                                                           //
+// Reduce Inputvec to Outputvev by averaging n elements      //
+// n (reducing factor) = floor(Inputvec.size() / lenoutvec)  //
+// ----------------------------------------------------------//
+
+obfunc MakeShort() {local i, n
+
+  n = int($o1.size()/$3)
+  $o2.resize($3)
+  for i=0, $3-1 {
+    $o2.x[i] = $o1.mean(i*n, (i+1)*n-1)
+  }
+  return $o2
+}   //  End of function
+
+
+
+// ---------Definition of objects -------------------------------------
+// --------------------------------------------------------------------
+
+
+// Objects for GABA Synapses ---------------------------------------------------------
+objref GABA_SYN_LOCATION
+GABA_SYN_LOCATION = new Random(seed)                // Position of GABA synapse as random Object
+
+objref gabasyn[ngabasyn]                            // Definition of synapse objects
+
+// random function for localization of synapses
+objref rand_loc
+
+// random function for synapses parameters
+objref rand_gaba_t, rand_gaba_g
+
+// definition of Vectors for Gaba-Stimulation (t_vec = timestamps t_vecr = sorted timestamps, g_vec = rel conductance)
+objref gabastim[ngabasyn], gaba_t_vec[ngabasyn], gaba_t_vecr[ngabasyn], synpulsegaba[ngabasyn], gaba_g_vec[ngabasyn]
+
+// Define vectors to link modelled parameter output ---------------------------------
+objref timevec, voltvec, clivec[ndend], hco3ivec[ndend]                   // vectors linked to parameter-pointers
+objref clivec_aver, hco3ivec_aver                                         // vectors for Averagees over all Dendrites
+objref shorttimevec, shortvoltvec, shortclivec, shorthco3ivec, spacevec   // shorter Vectros for output
+
+// Matrix for output 0 = time, 1 = Voltage, 2 = average Cli , 3 to 3+ndend, Cli n Dend[i]
+objref Outmatrix
+
+// Define Name of Output-File
+strdef OutFileName
+
+// Define Output File
+objref OutFile
+
+
+// Generate vectors and matrices -------------------------------------
+voltvec = new Vector()
+timevec = new Vector()
+clivec_aver = new Vector()
+hco3ivec_aver = new Vector()
+shortvoltvec = new Vector()
+shorttimevec = new Vector()
+shortclivec = new Vector()
+shorthco3ivec = new Vector()
+spacevec = new Vector()
+for i=0, ndend-1 {
+  clivec[i] = new Vector()
+  hco3ivec[i] = new Vector()
+}
+Outmatrix = new Matrix()
+
+
+
+// Start of Input generation -------------------------------------------
+
+// initiation of Random functions
+rand_loc = new Random(seed)
+rand_gaba_t = new Random(seed)
+rand_gaba_g = new Random(seed)
+
+//Define properties of random Function
+rand_gaba_t.normal(600, 9000)
+rand_gaba_g.normal(1, 0.28) //rel variance of GABA according to results
+
+// generate Vectors --- (gniputs, aninputs defines number of inputs per synapse) ------
+for i = 0, ngabasyn-1 {
+  gaba_t_vec[i] = new Vector(gninputs)
+  gaba_t_vecr[i] = new Vector(gninputs)
+  gaba_g_vec[i] = new Vector(gninputs)
+}
+
+  // Distribute GABA synapses -----------------------------------------------------------
+
+    for k=0, ngabasyn-1 {
+      pos = rand_loc.uniform(0,ndend-1)
+      pos2 = GABA_SYN_LOCATION.uniform (0.0001, 0.999)
+      dend_0[pos]{
+        gabasyn[k] = new gaba(pos2)
+        gabasyn[k].tau1 = 0.1
+        gabasyn[k].tau2 = DECAY_GABA
+        gabasyn[k].P = P_GABA
+        }
+      }
+
+
+//-- Simulation starts here -----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
+
+     // 1. define Cl- concentration ----------------------------------------------
+  
+    forsec all {
+      cli0_cldif_CA3_NKCC1_HCO3 = Cl_intra
+      cli_Start_cldif_CA3_NKCC1_HCO3 = Cl_intra
+      cli_cldif_CA3_NKCC1_HCO3 = Cl_intra
+    }
+
+    // 2. Generate timestamps/conductances for GABA synapses --------------------------------------
+    for f=0, ngabasyn-1 {
+      for i=0, gninputs-1 {
+          t = rand_gaba_t.repick()
+          g = rand_gaba_g.repick()
+          gaba_t_vec[f].x[i]=t
+          gaba_g_vec[f].x[i]=g * G_GABA
+      }
+    }
+
+    for f=0, ngabasyn-1 {
+      gaba_t_vecr[f] = gaba_t_vec[f].sort()
+    }
+
+
+  // 3. generate Vecstim-vectrors from the sorted timestamp-vectors -------------------------------
+      for i=0, ngabasyn-1 {
+        gabastim[i] = new VecStim()
+        gabastim[i].play(gaba_t_vecr[i])
+      }                                                 // GABA stimulator
+
+
+  // 4. Play the Vecstim objects to the synapses ---------------------------------------------
+      for i=0, ngabasyn-1 {
+        synpulsegaba[i] = new NetCon(gabastim[i], gabasyn[i], 0, 0, G_GABA)
+      }                                                  // GABA NetCon
+
+ 
+  // 5. Link Objects to Output-Vectors -----------------------------------
+        timevec.record(&t)   // Time vector
+        voltvec.record(&v(.5)) // Volt vector in soma
+        for i=0, ndend-1 {
+            clivec[i].record(&dend_0[i].cli(0.5))
+            hco3ivec[i].record(&dend_0[i].hco3i(0.5))
+        }
+
+  // 6. Run Simulation --------------------------------------------------------
+
+  //   run()  // run simulation in GUI
+ 

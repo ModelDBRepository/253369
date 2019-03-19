@@ -1,0 +1,7 @@
+// Start
+
+load_file("nrngui.hoc")
+load_file("cell_soma_dendrite_fine.hoc")
+load_file("init_Cldif_isolated_dendrite.hoc")
+load_file("GABA-Stim_3xPSC_isolated_dendrite_GUI.hoc")
+load_file("Isolated_Dendrite_Diff_Flux_3xGABA.ses")

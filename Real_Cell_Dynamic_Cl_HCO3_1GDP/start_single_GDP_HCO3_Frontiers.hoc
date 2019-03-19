@@ -1,0 +1,6 @@
+// Start
+
+load_file("nrngui.hoc")
+load_file("Cell1_Cl_HCO3_Pas.hoc")
+load_file("single_GDP_GABA_HCO3_ForTest.hoc")
+load_file("GDP_Cl_HCO3_All_short.ses")

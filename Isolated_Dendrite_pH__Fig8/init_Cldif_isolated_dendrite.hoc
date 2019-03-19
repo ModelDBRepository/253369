@@ -1,0 +1,37 @@
+
+// recall of Chloride Diffusion Model of Peter Jedlicka
+
+forall {
+    insert cldif_CA3_NKCC1_HCO3
+      cli0_cldif_CA3_NKCC1_HCO3 = 30
+      clo0_cldif_CA3_NKCC1_HCO3 = 133.5
+      cli_cldif_CA3_NKCC1_HCO3= 30
+      clo_cldif_CA3_NKCC1_HCO3=133.5
+      cli_Start_cldif_CA3_NKCC1_HCO3 = 30
+
+      hco3i0_cldif_CA3_NKCC1_HCO3 = 14.1
+      hco3o0_cldif_CA3_NKCC1_HCO3 = 24
+      hco3i_cldif_CA3_NKCC1_HCO3=14.1
+      hco3o_cldif_CA3_NKCC1_HCO3=24
+      hco3i_Start_cldif_CA3_NKCC1_HCO3 = 14.1
+
+      celsius = 31
+}
+
+
+//define ionic concentrations
+cli0_cl_ion = cli0_cldif_CA3_NKCC1_HCO3
+clo0_cl_ion = clo0_cldif_CA3_NKCC1_HCO3
+hco3i0_hco3_ion = hco3i0_cldif_CA3_NKCC1_HCO3
+hco3o0_hco3_ion = hco3o0_cldif_CA3_NKCC1_HCO3
+
+
+
+
+
+
+
+
+
+
+

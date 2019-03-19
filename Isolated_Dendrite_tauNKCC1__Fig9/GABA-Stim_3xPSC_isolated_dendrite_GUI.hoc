@@ -1,0 +1,56 @@
+// Simulation and analysis of Spatiotemporal Component of Cl- Gradients in a isolated dendrite
+
+// Define spatial properties of dendrite
+  ANZAHL_NODES = 100
+
+// Determination Parameters GABA
+  ANZAHL_GABA = 1        //Anzahl der synaptischen Pulse
+  G_GABA = 0.000789 * 2000    //This Value was pultiplished for the analysis 
+  P_GABA = 0.18
+  DECAY_GABA = 37  
+  GABA_SYN_LOCATION_1 = 0.5  // Position GABA Synapse for Pulses
+  GABA_SYN_LOCATION_2 = 0.25  // Position GABA Synapse for Pulses
+  GABA_SYN_LOCATION_3 = 0.75  // Position GABA Synapse for Pulses
+  ONSET_PULSE_1 = 100
+  ONSET_PULSE_2 = 600
+  ONSET_PULSE_3 = 600  
+
+
+//----- Insert synapses -------------------------
+// Determination of Synapses
+  objref gabasyn1, gabasyn2, gabasyn3 
+  dend {
+    // insert GABA synapse 
+    gabasyn1 = new gaba(GABA_SYN_LOCATION_1)
+    gabasyn2 = new gaba(GABA_SYN_LOCATION_2)
+    gabasyn3 = new gaba(GABA_SYN_LOCATION_3)
+    gabasyn1.tau1 = 0.1
+    gabasyn1.tau2 = DECAY_GABA 
+    gabasyn2.P = P_GABA
+    gabasyn2.tau1 = 0.1
+    gabasyn2.tau2 = DECAY_GABA 
+    gabasyn3.P = P_GABA
+    gabasyn3.tau1 = 0.1
+    gabasyn3.tau2 = DECAY_GABA 
+    gabasyn3.P = P_GABA
+  }
+
+// Definition of synaptic Stimuli
+  objref stimGABApuls1, stimGABApuls2, stimGABApuls3  //Pulssequenz GABA
+  stimGABApuls1 = new NetStim(GABA_SYN_LOCATION_1)
+  stimGABApuls1.number = ANZAHL_GABA
+  stimGABApuls1.start = ONSET_PULSE_1
+  stimGABApuls2 = new NetStim(GABA_SYN_LOCATION_2)
+  stimGABApuls2.number = ANZAHL_GABA
+  stimGABApuls2.start = ONSET_PULSE_2
+  stimGABApuls3 = new NetStim(GABA_SYN_LOCATION_3)
+  stimGABApuls3.number = ANZAHL_GABA
+  stimGABApuls3.start = ONSET_PULSE_3
+
+// Linkage of synaptic Inputs
+  objref synpulsegaba1,synpulsegaba2, synpulsegaba3 
+  synpulsegaba1 = new NetCon(stimGABApuls1, gabasyn1, 0, 0, G_GABA)
+  synpulsegaba2 = new NetCon(stimGABApuls2, gabasyn2, 0, 0, G_GABA)
+  synpulsegaba3 = new NetCon(stimGABApuls3, gabasyn3, 0, 0, G_GABA)
+
+

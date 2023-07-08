@@ -44,7 +44,7 @@ obfunc MakeShort() {local i, n
   lenghtoutputvec = 3000                   // Number of Lines for output (< 32000 for Excel-Figures)
 
 // Determination Parameters GABA -------
-  LEN_DENDR = 1000          // Dendrite has a length of 1000 µm
+  LEN_DENDR = 1000          // Dendrite has a length of 1000 Âµm
   ANZAHL_GABA = 1           //Anzahl der synaptischen Pulse
   G_GABA = 0.000789 * 2000  //This Value was pultiplished for the analysis 
   P_GABA = 0.18
